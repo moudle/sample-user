@@ -1,0 +1,58 @@
+{
+  "name": "@moudle/-user",
+  "version": "0.0.2",
+  "description": "",
+  "main": "dist/lib.js",
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    "./*": {
+      "types": "./dist/module/*.d.ts",
+      "import": "./dist/module/*.js",
+      "default": "./dist/module/*.js"
+    }
+  },
+  "scripts": {
+    "start": "npm run build && node dist",
+    "build": "rm -rf dist && tsc",
+    "typeorm": "typeorm-ts-node-commonjs",
+    "generate-migration": "npm run typeorm migration:generate -- $1 -d ./data-source.ts",
+    "migrate": "npm run typeorm migration:run -- -d ./data-source.ts"
+  },
+  "files": [
+    "dist/module",
+    "package.json"
+  ],
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@react-router/dev": "^7.15.1",
+    "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.8.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/react-router-dom": "^5.3.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@moudle/start": "^0.0.3",
+    "@react-router/express": "^7.15.1",
+    "axios": "^1.16.1",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mysql2": "^3.22.3",
+    "react-dom": "^19.2.6",
+    "react-router-dom": "^7.15.1",
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "^0.3.29",
+    "zod": "^4.4.3"
+  }
+}
