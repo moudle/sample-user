@@ -56,9 +56,18 @@ Set up the `package.json` exactly like this (include any extra dependencies you 
 **2. Module Configuration (`module/config-api.ts` & `module/config-ui.ts`)**
 *Explanation: Instead of relying on `.env` variables (which makes the module hard to reuse), this module uses `Config API` and `Config UI` as a stub and interface. The master/kernel project that installs this module MUST implement or set the values on these configuration objects. These configurations can be static variables (like dummy strings) or stub functions that the master project replaces with actual implementations later.*
 
-- `module/config-api.ts`: Export a mutable `let CONFIG_API_[MODULE_NAME_UPPERCASE]` containing API settings. Ensure you also add lifecycle event hooks (e.g. `onItemCreated`, `onUserRegistered`) so the master project can hook into module events without breaking isolation.
+- `module/config-api.ts`: Export a mutable `let CONFIG_API_[MODULE_NAME_UPPERCASE]` containing API settings. Ensure you also add lifecycle event hooks (e.g. `onItemCreated`) and authorization hooks (e.g. `getUserContext`) so the master project can inject user context without breaking isolation.
+*Explanation: Instead of relying on `.env` variables (which makes the module hard to reuse), this module uses `Config API` and `Config UI` as a stub and interface. The master/kernel project that installs this module MUST implement or set the values on these configuration objects. To configure multiple table names, define unique keys for each entity.*
+
+- `module/config-api.ts`: Export a mutable `let CONFIG_API_[MODULE_NAME_UPPERCASE]` containing API settings.
 ```typescript
 export let CONFIG_API_[MODULE_NAME_UPPERCASE] = {
+  // Use this for dynamic table names. If there are multiple entities, create a config for each:
+  table_name_entity_one: 'default_table_one',
+  table_name_entity_two: 'default_table_two',
+  
+  // Example: A stub for resolving the current user making the request
+  getUserContext: async (req: Request): Promise<{ id: number } | null> => { return { id: 1 }; },
   // Example: instead of process.env.API_SECRET, use this dummy string
   // The master project will overwrite this with the actual secret.
   api_secret_key: 'dummy-secret',
@@ -70,12 +79,18 @@ export let CONFIG_API_[MODULE_NAME_UPPERCASE] = {
 }
 ```
 
-- `module/config-ui.ts`: Export a mutable `let CONFIG_UI_[MODULE_NAME_UPPERCASE]` containing UI settings (e.g., redirect paths).
+- `module/config-ui.ts`: Export a mutable `let CONFIG_UI_[MODULE_NAME_UPPERCASE]` containing UI settings (e.g., redirect paths) and session hooks. The module should NOT use `localStorage` for tokens directly; it must rely on these hooks.
 ```typescript
 export let CONFIG_UI_[MODULE_NAME_UPPERCASE] = {
   // Example: instead of process.env.SUCCESS_REDIRECT, use this stub
   // The master project will overwrite this with the actual URL route.
   success_redirect_path: '/dummy-success',
+  
+  // Example: A stub for retrieving the auth token/session from the master project
+  getSession: async (): Promise<{ token: string } | null> => { return null; },
+  
+  // Example: A stub for triggering logout
+  logout: () => { console.log("Logout triggered"); },
   
   // Example: A stub UI function
   onUIAction: () => { console.log("Stub action"); }
@@ -84,23 +99,32 @@ export let CONFIG_UI_[MODULE_NAME_UPPERCASE] = {
 
 **3. Database Layer (`module/db.ts`)**
 - Define the TypeORM `@Entity()` classes extending `BaseEntity`.
-- **You may add more than one table/model in this file if necessary, but keep it as minimal as required to solve the problem.**
+- **Dynamic Table Names:** Inject the table name from `CONFIG_API` using `{ name: CONFIG_API_MODULE.table_name_... }`.
 - Export all entities directly from this file.
 ```typescript
 import { Entity, PrimaryGeneratedColumn, Column, BaseEntity, CreateDateColumn } from "typeorm"
+import { CONFIG_API_[MODULE_NAME_UPPERCASE] } from "./config-api";
 
-@Entity()
-export class [EntityName] extends BaseEntity {
+@Entity({ name: CONFIG_API_[MODULE_NAME_UPPERCASE].table_name_entity_one || 'default_table_one'})
+export class EntityOne extends BaseEntity {
   @PrimaryGeneratedColumn()
   id!: number;
   
   // Add other columns
+}
+
+@Entity({ name: CONFIG_API_[MODULE_NAME_UPPERCASE].table_name_entity_two || 'default_table_two'})
+export class EntityTwo extends BaseEntity {
+  @PrimaryGeneratedColumn()
+  id!: number;
 }
 ```
 
 **4. API Controllers (`module/api/*.ts`)**
 - Create separate files for each action (e.g., `create.ts`, `list.ts`).
 - Each file must export an async function `(request: Request, response: Response)`.
+- Use `CONFIG_API_[MODULE_NAME_UPPERCASE].getUserContext(req)` to resolve the active user instead of verifying JWTs directly.
+- **Type Safety:** When reading URL parameters in Express 5, explicitly cast them to strings before parsing (e.g., `parseInt(req.params.id as string)`).
 - Use `zod` to validate `request.body`.
 - Respond using `response.send(...)` or `response.status(400).send(...)`.
 
@@ -121,6 +145,7 @@ export const LIST_API_[MODULE_NAME_UPPERCASE] = {
 
 **6. UI Pages & Styling (`module/page/*.tsx`)**
 - Create standard React components.
+- **API Requests:** When using `axios` or `fetch`, always retrieve the token using `await CONFIG_UI_[MODULE_NAME_UPPERCASE].getSession()` and pass it in the `Authorization` header. DO NOT hardcode `localStorage.getItem('token')`.
 - **Visual Design Rules:** Do not implement basic or generic UI grids. Apply premium design aesthetics:
   - Vibrant Tailwind colors, custom gradients, and sleeker dark mode palettes (avoid default light blues and plain colors).
   - Modern card designs with borders, gradients, and micro-interactions (hover states, scaling elements).
